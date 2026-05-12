@@ -1,0 +1,78 @@
+﻿using ClosedXML.Excel;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+namespace Azubi_Einsatzplaner
+{
+    public class Import
+    {
+
+        readonly string _importPfad = @"C:\Temp\Azubi_Einsatzplaner\Azubi_Einsatzplaner\Import.xlsx";
+        // Datenbank Connection
+        readonly string _gConnectStr = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\Temp\Azubi_Einsatzplaner\Azubi_Einsatzplaner.mdb;Persist Security Info=False";
+        readonly ADODB.Connection _conn1 = new ADODB.Connection();
+
+        public void Importxlsx()
+        {
+            GetLongEventsXlsx(3, 1, "Berufsschule");
+            GetLongEventsXlsx(3, 6, "Ferien");
+            GetDayEventsXlsx(3, 4, "Brueckentag");
+
+        }
+
+        private void GetLongEventsXlsx( int zeile, int spalte, string art)
+        {
+            XLWorkbook workBook = XLWorkbook.OpenFromTemplate(_importPfad);
+            IXLWorksheet workSheet = workBook.Worksheets.First();
+
+            while (!workSheet.Cell(zeile, spalte).IsEmpty())
+            {
+                _conn1.Open(_gConnectStr);
+                ADODB.Recordset rs1 = new ADODB.Recordset();
+
+                string anfrage = "SELECT * FROM " + art + " WHERE Anfangsdatum IS NULL;";
+                rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+
+                rs1.AddNew();
+                rs1.Fields["Anfangsdatum"].Value = (DateTime)workSheet.Cell(zeile, spalte).Value;
+                rs1.Fields["Enddatum"].Value = (DateTime)workSheet.Cell(zeile, spalte + 1).Value;
+                rs1.Fields["Bezeichnung"].Value = workSheet.Cell(zeile, spalte + 2).Value.ToString();
+
+                // Schließen der Datenbankverbindung
+                rs1.Update();
+                rs1.Close();
+                _conn1.Close();
+
+                zeile++;
+            }
+        }
+
+        private void GetDayEventsXlsx(int zeile, int spalte, string art)
+        {
+            XLWorkbook workBook = XLWorkbook.OpenFromTemplate(_importPfad);
+            IXLWorksheet workSheet = workBook.Worksheets.First();
+
+            while (!workSheet.Cell(zeile, spalte).IsEmpty())
+            {
+                _conn1.Open(_gConnectStr);
+                ADODB.Recordset rs1 = new ADODB.Recordset();
+
+                string anfrage = "SELECT * FROM " + art + " WHERE Datum IS NULL;";
+                rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+
+                rs1.AddNew();
+                rs1.Fields["Datum"].Value = (DateTime)workSheet.Cell(zeile, spalte).Value;
+                rs1.Fields["Turnus"].Value = workSheet.Cell(zeile, spalte + 1).Value.ToString();
+
+                // Schließen der Datenbankverbindung
+                rs1.Update();
+                rs1.Close();
+                _conn1.Close();
+
+                zeile++;
+            }
+        }
+    }
+}

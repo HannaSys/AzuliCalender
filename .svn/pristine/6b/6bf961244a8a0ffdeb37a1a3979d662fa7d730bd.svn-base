@@ -1,0 +1,15 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+namespace Azubi_Einsatzplaner
+{
+    public class Einsatz
+    {
+        public DateTime Datum { get; set; }
+        public string Abteilung { get; set; }
+        public string Nachname { get; set; }
+        public string kuerzel { get; set; }
+    }
+}

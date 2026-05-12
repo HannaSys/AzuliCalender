@@ -1,0 +1,34 @@
+﻿<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="GesamtAnsicht.aspx.cs" Inherits="Azubi_Einsatzplaner.GesamtAnsicht" %>
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Azubi Einsatzplaner</title>
+    <link href="menubar_styles.css" rel="stylesheet" />
+</head>
+<body>
+    <form id="form1" runat="server">
+        <div>
+            <table class="spacing"> 
+                <tr> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=99'">Gesamt</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=0'">Lehrjahr 0</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=1'">Lehrjahr 1</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=2'">Lehrjahr 2</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=3'">Lehrjahr 3</td> 
+                    <td class="searchbar"><input id="ux_searchfield" type="text" value="Azubi suchen"/><asp:Button ID="ux_search_Button" runat="server" Text="Suchen" /></td>
+                </tr> 
+            </table>
+        </div>
+        <hr />
+        <div>
+
+            <asp:Table ID="Table1" runat="server">
+            </asp:Table>
+
+        </div>
+    </form>
+</body>
+</html>

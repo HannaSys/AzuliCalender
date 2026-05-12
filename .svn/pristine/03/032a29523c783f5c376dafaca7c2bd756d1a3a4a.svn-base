@@ -1,0 +1,48 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+
+namespace Azubi_Einsatzplaner
+{
+    public class Berechtigungen
+    {
+        // Datenbank Connection
+        readonly string _gConnectStr = Properties.Settings.Default.DBConnectionString;
+        readonly ADODB.Connection _conn1 = new ADODB.Connection();
+
+        //darf alles
+        string admin = Properties.Settings.Default.admin;
+
+        // Die Rechte des Users überprüfen
+        public Boolean CheckUserRights(string kalender, string user)
+        {
+            // überprüfen, ob der Admin oder der Azubi an den Kalender darf
+            if (user == admin || user == kalender)
+            {
+                return true;
+            } else
+            {
+                _conn1.Open(_gConnectStr);
+                ADODB.Recordset rs1 = new ADODB.Recordset();
+
+                // Berechtigungen des Azubis auslesen und überprüfen ob er auf den Kalender zugreifen darf
+                rs1.Open("SELECT * FROM Berechtigung WHERE kuerzel ='" + user + "' AND daten = '" + kalender + "';", _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+                if (rs1.EOF && rs1.BOF)
+                {
+                    // Schließen der Datenbankverbindung
+                    rs1.Close();
+                    _conn1.Close();
+                    return false;
+                } else
+                {
+                    // Schließen der Datenbankverbindung
+                    rs1.Close();
+                    _conn1.Close();
+                    return true;
+                }
+            }
+        }
+    }
+}

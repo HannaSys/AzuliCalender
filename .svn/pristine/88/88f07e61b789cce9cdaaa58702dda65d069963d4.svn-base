@@ -1,0 +1,89 @@
+﻿<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Calender.aspx.cs" Inherits="Azubi_Einsatzplaner.Calender" %>
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Azubi Einsatzplaner</title>
+    <link href="menubar_styles.css" rel="stylesheet" />
+    <link href="calender_styles.css" rel="stylesheet" />
+</head>
+<body>
+    <form id="form1" runat="server">
+        <div>
+            <table class="spacing">
+                <tr>
+                    <td class="lehrjahr">Gesamt</td>
+                    <td class="lehrjahr">Lehrjahr 0</td>
+                    <td class="lehrjahr">Lehrjahr 1</td>
+                    <td class="lehrjahr">Lehrjahr 2</td>
+                    <td class="lehrjahr">Lehrjahr 3</td>
+                    <td class="searchbar"><input id="ux_searchfield" type="text" value="Azubi suchen"/><asp:Button ID="ux_search_Button" runat="server" Text="Suchen" /></td>
+                </tr>
+            </table>
+        </div>
+        <hr />
+        <div>
+            <table style="width:100%;">
+                <tr>
+                    <td class="ansichtKalender">
+                        <asp:Table ID="calendarTable" runat="server" CssClass="calendar">
+                        </asp:Table>
+                    </td>
+                    <td class="setup">
+                        <div>
+                            <table class="data">
+                                <tr>
+                                    <td>Vorname</td>
+                                    <td>
+                                        <asp:Label ID="ux_vorname_Label" runat="server" Text="Label"></asp:Label>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Nachname</td>
+                                    <td>
+                                        <asp:Label ID="ux_nachname_Label" runat="server" Text="Label"></asp:Label>
+                                    </td>
+                                </tr>
+                                 <tr>
+                                    <td>Fachrichtung</td>
+                                    <td>
+                                        <asp:Label ID="ux_fachrichtung_Label" runat="server" Text="Label"></asp:Label>
+                                     </td>
+                                </tr>
+                                <tr>
+                                    <td>Lehrjahr</td>
+                                    <td>
+                                        <asp:Label ID="ux_lehrjahr_Label" runat="server" Text="Label"></asp:Label>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Turnus</td>
+                                    <td>
+                                        <asp:Label ID="ux_turnus_Label" runat="server" Text="Label"></asp:Label>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <hr />
+                        <div style="text-align:center;">
+                            <asp:DropDownList ID="DropDownList1" runat="server" CssClass="einsatz"></asp:DropDownList>
+                            <input id="Text1" type="text" class="einsatz" value="von" />
+                            <input id="Text2" type="text" class="einsatz" value="bis" />
+                            <input id="Text3" type="text" class="einsatz" value="Notizen"/>
+                            <asp:Button ID="Button1" runat="server" Text="Speichern" CssClass="einsatz"/>
+                        </div>
+                        <hr />
+                        <div style="text-align:center;">
+                            <asp:Button ID="ux_import_Button" runat="server" Text="Import" CssClass="portButtons"/>
+                            <asp:Button ID="ux_export_Button" runat="server" Text="Export" CssClass="portButtons"/>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+    </form>
+</body>
+</html>

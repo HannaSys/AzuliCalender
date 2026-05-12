@@ -1,0 +1,51 @@
+﻿
+.einsatz {
+    width:80%;
+    margin:5%;
+    text-align:center;
+}
+
+
+.data {
+    width:100%;
+    height:100%;
+    padding:5px;
+}
+    .data td {
+     padding:3px;
+    }
+
+.ansichtKalender {
+    width:85%;
+}
+
+.portButtons {
+    margin:5%;
+    width:35%;
+}
+
+.setup {
+    border: dotted;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.calendar {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+    .calendar td {
+        border:1px solid #ccc;
+        padding:3px;
+        text-align:left;
+    }
+
+    .calendar th {
+        border: 1px solid #ccc;
+        padding: 3px;
+        text-align: center;
+    }
+

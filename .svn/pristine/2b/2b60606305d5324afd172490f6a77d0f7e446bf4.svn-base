@@ -1,0 +1,234 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using System.Drawing;
+using System.Globalization;
+
+namespace Azubi_Einsatzplaner
+{
+    public partial class JahresAnsicht : System.Web.UI.Page
+    {
+        // Datenbank Connection
+        readonly string _gConnectStr = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\Temp\Azubi_Einsatzplaner\Azubi_Einsatzplaner.mdb;Persist Security Info=False";
+        readonly ADODB.Connection _conn1 = new ADODB.Connection();
+
+        protected void Page_Init(object sender, EventArgs e)
+        {
+            // ## TODO Berechtigungen
+            string user = GetUser();
+            Console.WriteLine(user);
+
+            // Ansichtselemente laden
+            Azubi_Load();
+            Fachbereiche_Load();
+
+        }
+
+        protected void Page_Load(object sender, EventArgs e)
+        {
+
+        }
+
+
+        // Ausgewählten Azubi auslesen 
+        private void Azubi_Load()
+        {
+            // Überprüfen, ob ein Azubi ordnungsgemäß ausgewählt wurde
+            if (Request.QueryString["azubi"] != null)
+            {
+                _conn1.Open(_gConnectStr);
+                ADODB.Recordset rs1 = new ADODB.Recordset();
+
+                // Informationen des Azubis auslesen und darstellen
+                rs1.Open("SELECT * FROM Auszubildender WHERE kuerzel ='" + Request.QueryString["azubi"] +"'", _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+                ux_AzubiNameLabel.Text = rs1.Fields["Nachname"].Value.ToString();
+                int year = Convert.ToInt32(rs1.Fields["Jahrgang"].Value.ToString());
+                
+                // Schließen der Datenbankverbindung
+                rs1.Close();
+                _conn1.Close();
+
+                // Kalender aller Ausbildungsjahre darstellen
+                CreateYearlyCalendar(year);
+            }
+            else
+            {
+                // Kein Azubi ausgewählt, dann zurück auf die "Startseite"
+                Response.Redirect("GesamtAnsicht.aspx");
+            }
+
+        }
+
+        // Fachbereiche in das DropDown schreiben
+        private void Fachbereiche_Load()
+        {
+            _conn1.Open(_gConnectStr);
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+
+            // Alle Abteilungen auslesen und in Dropdown schreiben
+            rs1.Open("SELECT * FROM Abteilung;", _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+            
+            ux_FachbereicheDropDown.Items.Add(new ListItem(""));
+            while (!rs1.EOF)
+            {
+                ux_FachbereicheDropDown.Items.Add(new ListItem(rs1.Fields["Abteilung"].Value.ToString()));
+                rs1.MoveNext();
+            }
+
+            // Schließen der Datenbankverbindung
+            rs1.Close();
+            _conn1.Close();
+        }
+
+        // Kalender aller Ausbildungsjahre darstellen
+        private void CreateYearlyCalendar(int lehrjahr)
+        {
+            // Vorherige Anzeigen löschen
+            ux_yearlyCalendarTable.Rows.Clear();
+
+            // Überschriften für die Spalten der Jahre
+            TableRow headerRow = new TableRow();
+            for (int i = 0; i <= 3; i++)
+            {
+
+                int year = lehrjahr + i;
+                TableHeaderCell headerCell = new TableHeaderCell();
+                
+                headerCell.ID = year.ToString();
+                headerCell.Text = year.ToString();
+                headerCell.Font.Bold = true;
+                headerCell.BackColor = Color.FromArgb(4, 149, 197);
+                headerCell.HorizontalAlign = HorizontalAlign.Center;
+                headerCell.Attributes["onclick"] = $"location.href='Calender.aspx?year={year}&azubi={Request.QueryString["azubi"]}'";
+                headerRow.Cells.Add(headerCell);
+            }
+            ux_yearlyCalendarTable.Rows.Add(headerRow);
+
+            List<Einsatz> einsaetze = GetEinsaetze();
+
+            // Reihen für jeden Monat erstellen
+            for (int month = 1; month <= 12; month++)
+            {
+                TableRow monthRow = new TableRow();
+
+
+                // Jede Reihe der Monate durchgehen für jedes Ausbildungsjahr
+                for (int header = 0; header <= 3; header++)
+                {
+                    TableCell monthCell = new TableCell();
+                    CheckBox checkBox = new CheckBox();
+
+                    checkBox.ID = header + "_" + GetMonthName(month);
+                    checkBox.Text = GetMonthName(month);
+
+                    // Einsätze beschriften
+                    foreach (Einsatz einsatz in einsaetze)
+                    {
+                        if (einsatz.Datum.Month == month && einsatz.Datum.Year == lehrjahr + header)
+                        {
+                            checkBox.Text += " (" + einsatz.Abteilung + ")";
+                        }
+                    }
+
+                    monthCell.Controls.Add(checkBox);
+                    monthCell.HorizontalAlign = HorizontalAlign.Center;
+                    monthRow.Cells.Add(monthCell);
+                }
+                ux_yearlyCalendarTable.Rows.Add(monthRow);
+            }
+        }
+
+        // Liste der Einsätze erstellen
+        private List<Einsatz> GetEinsaetze()
+        {
+            List<Einsatz> einsaetze = new List<Einsatz>();
+            DateTime anfangsdatum;
+            DateTime enddatum;
+
+            _conn1.Open(_gConnectStr);
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+
+            // Alle Einsätze des ausgewählten Azubis abrufen
+            rs1.Open("SELECT * FROM Einsatz WHERE kuerzel_Auszubildender = '" + Request.QueryString["azubi"] + "';", _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+
+            while (!rs1.EOF)
+            {
+                anfangsdatum = rs1.Fields["Anfangsdatum"].Value;
+                enddatum = rs1.Fields["Enddatum"].Value;
+                string abteilung = rs1.Fields["ID_Abteilung"].Value.ToString();
+
+                // Die Tage zwischen Anfangs- und Enddatum erstellen und zu einer Liste hinzufügen
+                // So können alle Tage des Einsatzes markiert werden
+                for (DateTime date = anfangsdatum; date <= enddatum; date = date.AddDays(1))
+                {
+                    Einsatz einsatz = new Einsatz();
+                    einsatz.Datum = date;
+                    einsatz.Abteilung = abteilung;
+                    einsaetze.Add(einsatz);
+                }
+
+                rs1.MoveNext();
+            }
+
+            // Schließen der Datenbankverbindung
+            rs1.Close();
+            _conn1.Close();
+
+            // Liste so ausdünnen
+            List<Einsatz> einsatzMonate = IsolateEinsatzMonate(einsaetze);
+
+            return einsatzMonate;
+        }
+
+        // Liste ausdünnen, sodass nur noch ein Eintrag pro Abteilung und Monat entstehen
+        // Bei wechselnen Einsätze im Monat werden einige Monate doppelt vorkommen
+        private List<Einsatz> IsolateEinsatzMonate(List<Einsatz> einsaetze)
+        {
+            List<Einsatz> einsatzMonate = new List<Einsatz>();
+            int vorMonat = 0;
+            string vorAbteilung = "";
+
+            foreach (Einsatz einsatz in einsaetze)
+            {
+                //Eintrag schreiben, wenn der Monat oder die Abteilung von davor abweichen
+                if (vorMonat != einsatz.Datum.Month || vorAbteilung != einsatz.Abteilung)
+                {
+
+                    Einsatz monatsEinsatz = new Einsatz();
+                    monatsEinsatz.Datum = einsatz.Datum;
+                    monatsEinsatz.Abteilung = einsatz.Abteilung;
+                    einsatzMonate.Add(einsatz);
+                    vorAbteilung = einsatz.Abteilung;
+                    vorMonat = einsatz.Datum.Month;
+                }
+            }
+
+            return einsatzMonate;
+        }
+
+        // den Kalender unserer Kultur verwenden, um den richtig Monat zu bekommen
+        private string GetMonthName(int month)
+        {
+            return CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(month);
+        }
+
+        // Gibt den Namen des Windows-Users zurück
+        private string GetUser()
+        {
+            // aktuellen Anwender holen
+            string _UserID = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+            _UserID = _UserID.Replace(@"IBBADS\", "");
+
+            return _UserID;
+        }
+
+        protected void ux_exportButton_Click(object sender, EventArgs e)
+        {
+            Export export = new Export();
+            export.Exportxlsx();
+        }
+    }
+}

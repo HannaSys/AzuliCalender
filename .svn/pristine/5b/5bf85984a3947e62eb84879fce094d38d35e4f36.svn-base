@@ -1,0 +1,111 @@
+﻿<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Calender.aspx.cs" Inherits="Azubi_Einsatzplaner.Calender" %>
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Azubi Einsatzplaner</title>
+    <link href="menubar_styles.css" rel="stylesheet" />
+    <link href="calender_styles.css" rel="stylesheet" />
+</head>
+<body>
+    <form id="form1" runat="server">
+        <div>
+            <table class="spacing"> 
+                <tr> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx'">Gesamt</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=0'">Lehrjahr 0</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=1'">Lehrjahr 1</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=2'">Lehrjahr 2</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=3'">Lehrjahr 3</td>
+                    <td style="text-align:right">
+                        <asp:Button ID="ux_importButton" runat="server" Text="Import" OnClick="ux_importButton_Click"/>
+                        <asp:Button ID="ux_exportButton" runat="server" Text="Export" OnClick="ux_exportButton_Click"/>
+                    </td>
+                </tr> 
+            </table>
+        </div>
+        <hr style="margin-top:1%"/>
+        <div>
+            <table style="width:100%;">
+                <tr>
+                    <td class="ansichtKalender">
+                        <div>
+
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td style="text-align:left;"><asp:Button ID="ux_previousYearButton" runat="server" Text="Vorheriges Jahr" OnClick="ux_previousYearButton_Click" /></td>
+                                    <td><asp:Label ID="ux_todaysYearLabel" runat="server" Text="Label" CssClass="headlines"></asp:Label></td>
+                                    <td style="text-align:right;"><asp:Button ID="ux_nextYearButton" runat="server" Text="Nächstes Jahr" OnClick="ux_nextYearButton_Click" /></td>
+                                </tr>
+                            </table>
+
+                        </div>
+                        <asp:Table ID="ux_calendarTable" runat="server" CssClass="calendar" >
+                        </asp:Table>
+                    </td>
+                    <td class="setup">
+                        <div>
+                            <div>
+                             
+                                <table class="data">
+                                    <tr>
+                                        <td>Vorname</td>
+                                        <td>
+                                            <asp:Label ID="ux_vornameLabel" runat="server" Text="Label"></asp:Label>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Nachname</td>
+                                        <td>
+                                            <asp:Label ID="ux_nachnameLabel" runat="server" Text="Label"></asp:Label>
+                                        </td>
+                                    </tr>
+                                     <tr>
+                                        <td>Fachrichtung</td>
+                                        <td>
+                                            <asp:Label ID="ux_fachrichtungLabel" runat="server" Text="Label"></asp:Label>
+                                         </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Jahrgang</td>
+                                        <td>
+                                            <asp:Label ID="ux_jahrgangLabel" runat="server" Text="Label"></asp:Label>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Turnus</td>
+                                        <td>
+                                            <asp:Label ID="ux_turnusLabel" runat="server" Text="Label"></asp:Label>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <hr />
+                            <div style="text-align:center; margin-bottom:2%">
+                                <asp:DropDownList ID="ux_AbteilungenDropDown" runat="server" CssClass="einsatz"></asp:DropDownList>
+                                <asp:TextBox ID="ux_EinsatzDatumAnfang" runat="server" CssClass="einsatz" />
+                                <asp:TextBox ID="ux_EinsatzDatumEnde" runat="server" CssClass="einsatz"/>
+                                <asp:Button ID="ux_saveBtton" runat="server" Text="Speichern" CssClass="einsatz" OnClick="ux_saveBtton_Click"/>
+                                <asp:Button ID="ux_EditSaveButton" runat="server" Text="Änderung Speichern" CssClass="einsatz" OnClick="ux_EditSaveButton_Click" Enabled="False" Visible="False"/>
+                                <div>
+                                    <asp:Label ID="ux_FehlermeldungLabel" runat="server" Visible="False" CssClass="einsatz"></asp:Label>
+                                    <asp:Label ID="ux_idLabel" runat="server" Text="" Visible="False" CssClass="einsatz"></asp:Label>
+
+                                </div>
+                            </div>
+                            <hr />
+                            <div>
+                                <asp:Table ID="ux_legendeTable" runat="server" CssClass="spacing"></asp:Table>
+                            </div>
+                        </div>
+
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+    </form>
+</body>
+</html>

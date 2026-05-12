@@ -1,0 +1,78 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using System.Drawing;
+using System.Globalization;
+
+namespace Azubi_Einsatzplaner
+{
+    public partial class JahresAnsicht : System.Web.UI.Page
+    {
+
+        protected void Page_Init(object sender, EventArgs e)
+        {
+            ux_AzubiNameLabel.Text = "##Azubi Namen per Datenbankabfrage";
+            int year = 2021;
+            CreateYearlyCalendar(year);
+        }
+
+        protected void Page_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void CreateYearlyCalendar(int lehrjahr)
+        {
+            ux_yearlyCalendarTable.Rows.Clear();
+
+            // Überschriften für die Spalten der Jahre
+            TableRow headerRow = new TableRow();
+            for (int i = 0; i <= 3; i++)
+            {
+
+                int year = lehrjahr + i;
+                TableHeaderCell headerCell = new TableHeaderCell();
+                
+                headerCell.ID = year.ToString();
+                headerCell.Text = year.ToString();
+                headerCell.Font.Bold = true;
+                headerCell.BackColor = Color.FromArgb(4, 149, 197);
+                headerCell.HorizontalAlign = HorizontalAlign.Center;
+                headerCell.Attributes["onclick"] = $"location.href='Calender.aspx?year={year}'";
+                headerRow.Cells.Add(headerCell);
+            }
+            ux_yearlyCalendarTable.Rows.Add(headerRow);
+
+            // Reihen für jeden Monat erstellen
+            for (int month = 1; month <= 12; month++)
+            {
+                TableRow monthRow = new TableRow();
+
+
+                // Jede Spalte der Monate durchgehen
+                for (int header = 0; header <= 3; header++)
+                {
+                    TableCell monthCell = new TableCell();
+                    CheckBox checkBox = new CheckBox();
+
+                    checkBox.ID = header + "_" + GetMonthName(month);
+                    checkBox.Text = GetMonthName(month);
+
+                    monthCell.Controls.Add(checkBox);
+                    monthCell.HorizontalAlign = HorizontalAlign.Center;
+                    monthRow.Cells.Add(monthCell);
+                }
+                ux_yearlyCalendarTable.Rows.Add(monthRow);
+            }
+        }
+
+        // den Kalender unserer Kultur verwenden um den richtig Monat zu bekommen
+        private string GetMonthName(int month)
+        {
+            return CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(month);
+        }
+    }
+}

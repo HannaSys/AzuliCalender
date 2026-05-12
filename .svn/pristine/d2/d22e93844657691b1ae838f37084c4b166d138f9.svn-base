@@ -1,0 +1,104 @@
+﻿<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Calender.aspx.cs" Inherits="Azubi_Einsatzplaner.Calender" %>
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Azubi Einsatzplaner</title>
+    <link href="menubar_styles.css" rel="stylesheet" />
+    <link href="calender_styles.css" rel="stylesheet" />
+</head>
+<body>
+    <form id="form1" runat="server">
+        <div>
+            <table class="spacing"> 
+                <tr> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx'">Gesamt</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=0'">Lehrjahr 0</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=1'">Lehrjahr 1</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=2'">Lehrjahr 2</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=3'">Lehrjahr 3</td> 
+                    <td class="searchbar"><input id="ux_searchfield" type="text" value="Azubi suchen"/><asp:Button ID="ux_search_Button" runat="server" Text="Suchen" /></td>
+                </tr> 
+            </table>
+        </div>
+        <hr style="margin-top:1%"/>
+        <div>
+            <table style="width:100%;">
+                <tr>
+                    <td class="ansichtKalender">
+                        <div>
+
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td style="text-align:left;"><asp:Button ID="ux_previousYearButton" runat="server" Text="Vorheriges Jahr" OnClick="ux_previousYearButton_Click" /></td>
+                                    <td><asp:Label ID="ux_todaysYearLabel" runat="server" Text="Label" CssClass="headlines"></asp:Label></td>
+                                    <td style="text-align:right;"><asp:Button ID="ux_nextYearButton" runat="server" Text="Nächstes Jahr" OnClick="ux_nextYearButton_Click" /></td>
+                                </tr>
+                            </table>
+
+                        </div>
+                        <asp:Table ID="ux_calendarTable" runat="server" CssClass="calendar" >
+                        </asp:Table>
+                    </td>
+                    <td class="setup">
+                        <div>
+                            <div>
+                             
+                                <table class="data">
+                                    <tr>
+                                        <td>Vorname</td>
+                                        <td>
+                                            <asp:Label ID="ux_vornameLabel" runat="server" Text="Label"></asp:Label>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Nachname</td>
+                                        <td>
+                                            <asp:Label ID="ux_nachnameLabel" runat="server" Text="Label"></asp:Label>
+                                        </td>
+                                    </tr>
+                                     <tr>
+                                        <td>Fachrichtung</td>
+                                        <td>
+                                            <asp:Label ID="ux_fachrichtungLabel" runat="server" Text="Label"></asp:Label>
+                                         </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Lehrjahr</td>
+                                        <td>
+                                            <asp:Label ID="ux_lehrjahrLabel" runat="server" Text="Label"></asp:Label>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Turnus</td>
+                                        <td>
+                                            <asp:Label ID="ux_turnusLabel" runat="server" Text="Label"></asp:Label>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <hr />
+                            <div style="text-align:center;">
+                                <asp:DropDownList ID="ux_AbteilungenDropDown" runat="server" CssClass="einsatz"></asp:DropDownList>
+                                <input id="ux_EinsatzDatumVon" type="text" class="einsatz" value="von" />
+                                <input id="ux_EinsatzDatumBis" type="text" class="einsatz" value="bis" />
+                                <input id="ux_EinsatzNotizen" type="text" class="einsatz" value="Notizen"/>
+                                <asp:Button ID="ux_saveBtton" runat="server" Text="Speichern" CssClass="einsatz"/>
+                            </div>
+                            <hr />
+                            <div style="text-align:center;">
+                                <asp:Button ID="ux_import_Button" runat="server" Text="Import" CssClass="portButtons"/>
+                                <asp:Button ID="ux_export_Button" runat="server" Text="Export" CssClass="portButtons"/>
+                            </div>
+                        </div>
+
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+    </form>
+</body>
+</html>

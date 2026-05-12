@@ -1,0 +1,55 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+namespace Azubi_Einsatzplaner
+{
+    public class Berechtigungen
+    {
+        // Datenbank Connection
+        readonly string _gConnectStr = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\Temp\Azubi_Einsatzplaner\Azubi_Einsatzplaner.mdb;Persist Security Info=False";
+        readonly ADODB.Connection _conn1 = new ADODB.Connection();
+
+        //darf alles
+        string admin = "gramatzk";
+        public Boolean CheckUserRights(string kalender)
+        {
+            string user = GetUser();
+
+            if (user == admin || user == kalender)
+            {
+                return true;
+            } else
+            {
+                _conn1.Open(_gConnectStr);
+                ADODB.Recordset rs1 = new ADODB.Recordset();
+
+                // Informationen des Azubis auslesen und darstellen
+                rs1.Open("SELECT * FROM Berechtigung WHERE kuerzel ='" + user + "' AND daten = '" + kalender + "';", _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+                if (rs1.EOF && rs1.BOF)
+                {
+                    // Schließen der Datenbankverbindung
+                    rs1.Close();
+                    _conn1.Close();
+                    return false;
+                } else
+                {
+                    // Schließen der Datenbankverbindung
+                    rs1.Close();
+                    _conn1.Close();
+                    return true;
+                }
+            }
+        }
+        // Gibt den Namen des Windows-Users zurück
+        public string GetUser()
+        {
+            // aktuellen Anwender holen
+            string _UserID = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+            _UserID = _UserID.Replace(@"IBBADS\", "");
+
+            return _UserID;
+        }
+    }
+}

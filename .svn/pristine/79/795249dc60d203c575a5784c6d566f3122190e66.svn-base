@@ -1,0 +1,134 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using System.Drawing;
+using System.Globalization;
+
+namespace Azubi_Einsatzplaner
+{
+    public partial class JahresAnsicht : System.Web.UI.Page
+    {
+        readonly string _gConnectStr = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\Temp\Azubi_Einsatzplaner\Azubi_Einsatzplaner.mdb;Persist Security Info=False";
+        readonly ADODB.Connection _conn1 = new ADODB.Connection();
+
+        protected void Page_Init(object sender, EventArgs e)
+        {
+            string user = GetUser();
+            Console.WriteLine(user);
+            Azubi_Load();
+            Fachbereiche_Load();
+
+        }
+
+        protected void Page_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Azubi_Load()
+        {
+            if (Request.QueryString["azubi"] != null)
+            {
+                _conn1.Open(_gConnectStr);
+
+                ADODB.Recordset rs1 = new ADODB.Recordset();
+                rs1.Open("SELECT * FROM Auszubildender WHERE kuerzel ='" + Request.QueryString["azubi"] +"'", _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+                ux_AzubiNameLabel.Text = rs1.Fields["Nachname"].Value.ToString();
+                int year = Convert.ToInt32(rs1.Fields["Jahrgang"].Value.ToString());
+                
+                //schließen der Datenbank
+                rs1.Close();
+                _conn1.Close();
+
+                CreateYearlyCalendar(year);
+            }
+            else
+            {
+                Response.Redirect("GesamtAnsicht.aspx");
+            }
+
+        }
+
+        private void Fachbereiche_Load()
+        {
+            _conn1.Open(_gConnectStr);
+
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+            rs1.Open("SELECT * FROM Abteilung;", _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+            
+            ux_FachbereicheDropDown.Items.Add(new ListItem(""));
+            while (!rs1.EOF)
+            {
+                ux_FachbereicheDropDown.Items.Add(new ListItem(rs1.Fields["Abteilung"].Value.ToString()));
+                rs1.MoveNext();
+            }
+
+            //schließen der Datenbank
+            rs1.Close();
+            _conn1.Close();
+        }
+
+        private void CreateYearlyCalendar(int lehrjahr)
+        {
+            ux_yearlyCalendarTable.Rows.Clear();
+
+            // Überschriften für die Spalten der Jahre
+            TableRow headerRow = new TableRow();
+            for (int i = 0; i <= 3; i++)
+            {
+
+                int year = lehrjahr + i;
+                TableHeaderCell headerCell = new TableHeaderCell();
+                
+                headerCell.ID = year.ToString();
+                headerCell.Text = year.ToString();
+                headerCell.Font.Bold = true;
+                headerCell.BackColor = Color.FromArgb(4, 149, 197);
+                headerCell.HorizontalAlign = HorizontalAlign.Center;
+                headerCell.Attributes["onclick"] = $"location.href='Calender.aspx?year={year}&azubi={Request.QueryString["azubi"]}'";
+                headerRow.Cells.Add(headerCell);
+            }
+            ux_yearlyCalendarTable.Rows.Add(headerRow);
+
+            // Reihen für jeden Monat erstellen
+            for (int month = 1; month <= 12; month++)
+            {
+                TableRow monthRow = new TableRow();
+
+
+                // Jede Spalte der Monate durchgehen
+                for (int header = 0; header <= 3; header++)
+                {
+                    TableCell monthCell = new TableCell();
+                    CheckBox checkBox = new CheckBox();
+
+                    checkBox.ID = header + "_" + GetMonthName(month);
+                    checkBox.Text = GetMonthName(month);
+
+                    monthCell.Controls.Add(checkBox);
+                    monthCell.HorizontalAlign = HorizontalAlign.Center;
+                    monthRow.Cells.Add(monthCell);
+                }
+                ux_yearlyCalendarTable.Rows.Add(monthRow);
+            }
+        }
+
+        // den Kalender unserer Kultur verwenden um den richtig Monat zu bekommen
+        private string GetMonthName(int month)
+        {
+            return CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(month);
+        }
+
+        private string GetUser()
+        {
+            // aktuellen Anwender holen
+            string _UserID = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+            _UserID = _UserID.Replace(@"IBBADS\", "");
+
+            return _UserID;
+        }
+    }
+}

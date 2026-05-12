@@ -1,0 +1,147 @@
+﻿using ClosedXML.Excel;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+
+
+namespace Azubi_Einsatzplaner
+{
+    public class Export
+    {
+        // Datenbank Connection
+        readonly string _gConnectStr = @"Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\Temp\Azubi_Einsatzplaner\Azubi_Einsatzplaner.mdb;Persist Security Info=False";
+        readonly ADODB.Connection _conn1 = new ADODB.Connection();
+        
+
+        public void Exportxlsx()
+        {
+            //XLWorkbook wb2 = XLWorkbook.OpenFromTemplate(@"grughr7gh");
+            //IXLWorksheet ws = wb2.Worksheets.First();
+            string vorherigerAzubi = "";
+            int spalte = -2;
+            int zeile = 1;
+
+            List<Einsatz> einsaetze = GetAllEinsaetze();
+            XLWorkbook workBook = new XLWorkbook();
+            IXLWorksheet workSheet = workBook.AddWorksheet("Export");
+
+
+            foreach (Einsatz einsatz in einsaetze)
+            {                
+                if (vorherigerAzubi != einsatz.kuerzel)
+                {
+                    spalte = spalte + 3;
+                    zeile = 1;
+
+                    workSheet.Cell(zeile, spalte).Value = einsatz.Nachname;
+                    workSheet.Range(workSheet.Cell(zeile, spalte), workSheet.Cell(zeile, spalte + 1)).Merge();
+                    workSheet.Cell(zeile, spalte).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    workSheet.Cell(zeile, spalte).Style.Font.SetBold();
+
+                    zeile++;
+                    for (int jahr = 0; jahr < 2; jahr++)
+                    {
+                        for (int monat = 1; monat <= 12; monat++)
+                        {
+                            workSheet.Cell(zeile, spalte + 1).Value = monat.ToString() + " " + DateTime.Now.AddYears(jahr).Year;
+                            workSheet.Cell(zeile, spalte + 1 ).Style.NumberFormat.Format = "MMM-YY";
+
+                            foreach (Einsatz einsatzMonat in einsaetze)
+                            {
+                                if (einsatz.kuerzel == einsatzMonat.kuerzel && einsatzMonat.Datum.Month == monat && einsatzMonat.Datum.Year == DateTime.Now.Year + jahr)
+                                {
+                                    workSheet.Cell(zeile, spalte).Value = einsatzMonat.Abteilung;
+                                }
+                            }
+
+                            if (monat == 12)
+                            {
+                                workSheet.Cell(zeile, spalte).Style.Border.BottomBorder = XLBorderStyleValues.Thick;
+                                workSheet.Cell(zeile, spalte + 1).Style.Border.BottomBorder = XLBorderStyleValues.Thick;
+                            }
+                            zeile++;
+                        }
+                    }
+                    
+                    vorherigerAzubi = einsatz.kuerzel;
+                }
+                zeile++;
+            }
+
+            workSheet.Columns().Width = 15;
+            workBook.SaveAs(@"C:\Temp\Azubi_Einsatzplaner\Azubi_Einsatzplaner\Export.xlsx");
+
+        }
+
+        // Liste der Einsätze erstellen
+        private List<Einsatz> GetAllEinsaetze()
+        {
+            List<Einsatz> einsaetze = new List<Einsatz>();
+            DateTime anfangsdatum;
+            DateTime enddatum;
+
+            _conn1.Open(_gConnectStr);
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+
+            // Alle Einsätze des ausgewählten Azubis abrufen
+            string anfrage = "SELECT * FROM Auszubildender INNER JOIN Einsatz ON Auszubildender.kuerzel = Einsatz.kuerzel_Auszubildender WHERE Year(Date()) <= Year(Einsatz.Anfangsdatum) ORDER BY Einsatz.kuerzel_Auszubildender, Einsatz.Anfangsdatum;";
+            rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockOptimistic);
+
+            while (!rs1.EOF)
+            {
+                anfangsdatum = rs1.Fields["Anfangsdatum"].Value;
+                enddatum = rs1.Fields["Enddatum"].Value;
+                string abteilung = rs1.Fields["ID_Abteilung"].Value.ToString();
+
+                // Die Tage zwischen Anfangs- und Enddatum erstellen und zu einer Liste hinzufügen
+                // So können alle Tage des Einsatzes markiert werden
+                for (DateTime date = anfangsdatum; date <= enddatum; date = date.AddDays(1))
+                {
+                    Einsatz einsatz = new Einsatz();
+                    einsatz.Datum = date;
+                    einsatz.Abteilung = abteilung;
+                    einsatz.Nachname = rs1.Fields["Nachname"].Value.ToString();
+                    einsatz.kuerzel = rs1.Fields["kuerzel"].Value.ToString();
+                    einsaetze.Add(einsatz);
+                }
+
+                rs1.MoveNext();
+            }
+
+            // Schließen der Datenbankverbindung
+            rs1.Close();
+            _conn1.Close();
+
+            // Liste so ausdünnen
+            List<Einsatz> einsatzMonate = IsolateAllEinsatzMonate(einsaetze);
+
+            return einsatzMonate;
+        }
+
+        // Liste ausdünnen, sodass nur noch ein Eintrag pro Abteilung und Monat entstehen
+        // Bei wechselnen Einsätze im Monat werden einige Monate doppelt vorkommen
+        private List<Einsatz> IsolateAllEinsatzMonate(List<Einsatz> einsaetze)
+        {
+            List<Einsatz> einsatzMonate = new List<Einsatz>();
+            int vorMonat = 0;
+
+            foreach (Einsatz einsatz in einsaetze)
+            {
+                //Eintrag schreiben, wenn der Monat von davor abweicht
+                if (vorMonat != einsatz.Datum.Month)
+                {
+                    Einsatz monatsEinsatz = new Einsatz();
+                    monatsEinsatz.Datum = einsatz.Datum;
+                    monatsEinsatz.Abteilung = einsatz.Abteilung;
+                    monatsEinsatz.Nachname = einsatz.Nachname;
+                    monatsEinsatz.kuerzel = einsatz.kuerzel;
+                    einsatzMonate.Add(einsatz);
+                    vorMonat = einsatz.Datum.Month;
+                }
+            }
+            return einsatzMonate;
+        }
+    }
+}

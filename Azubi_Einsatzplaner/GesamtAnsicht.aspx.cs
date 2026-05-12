@@ -1,0 +1,194 @@
+﻿using System;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using System.Drawing;
+
+namespace Azubi_Einsatzplaner
+{
+    public partial class GesamtAnsicht : System.Web.UI.Page
+    {
+        // Datenbank Connection
+        readonly string _gConnectStr = Properties.Settings.Default.DBConnectionString;
+        readonly ADODB.Connection _conn1 = new ADODB.Connection();
+
+        Berechtigungen berechtigung = new Berechtigungen();
+        string admin = Properties.Settings.Default.admin;
+
+        protected void Page_Init(object sender, EventArgs e)
+        {
+            // Alle ausgewählten Azubis darstellen
+            CreateAzubiTable();
+            string logonUser = Request.LogonUserIdentity.Name.ToLower().Replace(@"ibbads\", "");
+
+            // Buttons nur für den Admin freigeben
+            if (logonUser != admin)
+            {
+                ux_exportButton.Enabled = false;
+                ux_importButton.Enabled = false;
+            }
+        }
+
+        protected void Page_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        // Alle ausgewählten Azubis darstellen
+        private void CreateAzubiTable()
+        {
+            // Vorherige Anzeigen löschen
+            ux_AzubiInfoTable.Rows.Clear();
+
+            // Tabellenköpfe erzeugen
+            TableRow headerRow = new TableRow();
+            string[] header = { "Nachname", "Vorname", "Fachrichtung", "Jahrgang", "Turnus" };
+            for (int i = 0; i <= header.Length - 1; i++)
+            {
+                TableHeaderCell headerCell = new TableHeaderCell();
+                headerCell.Text = header[i];
+                headerCell.Font.Bold = true;
+                headerCell.BackColor = Color.FromArgb(4, 149, 197);
+                headerCell.HorizontalAlign = HorizontalAlign.Center;
+                headerRow.Cells.Add(headerCell);
+            }
+            ux_AzubiInfoTable.Rows.Add(headerRow);
+
+            _conn1.Open(_gConnectStr);
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+
+            // Darstellung der ausgewählten Azubis
+            // Bei getroffener Auswahl nur bestimmte Azubis anzeigen
+            if (Request.QueryString["cell"] != null)
+            {
+                // Auswahl in eine Zahl umwandeln
+                int cellIndex = Convert.ToInt32(Request.QueryString["cell"]);
+                int lehrjahr;
+
+                // Alle Azubis auslesen
+                rs1.Open("SELECT * FROM Auszubildender", _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockReadOnly);
+                while (!rs1.EOF)
+                {
+                    // Lehrjahr mit Augustumschwung berechnen
+                    lehrjahr = LehrjahrBrechnen(rs1.Fields["Jahrgang"].Value);
+
+                    // Nur zutreffende Azubis darstellen
+                    if (Request.QueryString["cell"] == lehrjahr.ToString())
+                    {
+                        TableRow row = new TableRow();
+
+                        TableCell nachnameCell = new TableCell();
+                        Button ansichtButton = new Button();
+                        ansichtButton.Text = rs1.Fields["Nachname"].Value.ToString();
+                        ansichtButton.Attributes.CssStyle.Add(HtmlTextWriterStyle.Width, "100%");
+                        ansichtButton.Attributes.CssStyle.Add(HtmlTextWriterStyle.TextAlign, "left");
+                        ansichtButton.PostBackUrl = $"JahresAnsicht.aspx?azubi={rs1.Fields["kuerzel"].Value.ToString()}";
+                        nachnameCell.Controls.Add(ansichtButton);
+                        row.Cells.Add(nachnameCell);
+
+                        TableCell vornameCell = new TableCell();
+                        vornameCell.Text = rs1.Fields["Vorname"].Value.ToString();
+                        row.Cells.Add(vornameCell);
+
+                        TableCell fachrichtungCell = new TableCell();
+                        fachrichtungCell.Text = rs1.Fields["fachrichtung"].Value.ToString();
+                        row.Cells.Add(fachrichtungCell);
+
+                        TableCell lehrjahrCell = new TableCell();
+                        lehrjahrCell.Text = rs1.Fields["Jahrgang"].Value.ToString();
+                        row.Cells.Add(lehrjahrCell);
+
+                        TableCell turnusCell = new TableCell();
+                        turnusCell.Text = rs1.Fields["Turnus"].Value.ToString();
+                        row.Cells.Add(turnusCell);
+
+                        // Link auf die Jahresansicht des Azubis verweisen
+                        row.Attributes["onclick"] = $"location.href='JahresAnsicht.aspx?azubi={rs1.Fields["kuerzel"].Value.ToString()}'";
+                        ux_AzubiInfoTable.Rows.Add(row);
+                    }
+                    rs1.MoveNext();
+                }
+
+                // Schließen der Datenbankverbindung
+                rs1.Close();
+                _conn1.Close();
+
+            }
+            else
+            {
+                // Alle Azubis auslesen
+                rs1.Open("SELECT * FROM Auszubildender", _conn1, ADODB.CursorTypeEnum.adOpenForwardOnly, ADODB.LockTypeEnum.adLockReadOnly);
+
+                while (!rs1.EOF)
+                {
+                    TableRow row = new TableRow();
+                    TableCell nachnameCell = new TableCell();
+                    Button ansichtButton = new Button();
+                    ansichtButton.Text = rs1.Fields["Nachname"].Value.ToString();
+                    ansichtButton.Attributes.CssStyle.Add(HtmlTextWriterStyle.Width, "100%");
+                    ansichtButton.Attributes.CssStyle.Add(HtmlTextWriterStyle.TextAlign, "left");
+                    ansichtButton.PostBackUrl = $"JahresAnsicht.aspx?azubi={rs1.Fields["kuerzel"].Value.ToString()}";
+                    nachnameCell.Controls.Add(ansichtButton);
+                    row.Cells.Add(nachnameCell);
+
+                    TableCell vornameCell = new TableCell();
+                    vornameCell.Text = rs1.Fields["Vorname"].Value.ToString();
+                    row.Cells.Add(vornameCell);
+
+                    TableCell fachrichtungCell = new TableCell();
+                    fachrichtungCell.Text = rs1.Fields["fachrichtung"].Value.ToString();
+                    row.Cells.Add(fachrichtungCell);
+
+                    TableCell lehrjahrCell = new TableCell();
+                    lehrjahrCell.Text = rs1.Fields["Jahrgang"].Value.ToString();
+                    row.Cells.Add(lehrjahrCell);
+
+                    TableCell turnusCell = new TableCell();
+                    turnusCell.Text = rs1.Fields["Turnus"].Value.ToString();
+                    row.Cells.Add(turnusCell);
+
+                    // Link auf die Jahresansicht des Azubis verweisen
+                    row.Attributes["onclick"] = $"location.href='JahresAnsicht.aspx?azubi={rs1.Fields["kuerzel"].Value.ToString()}'";
+                    ux_AzubiInfoTable.Rows.Add(row);
+
+                    rs1.MoveNext();
+                }
+
+                // Schließen der Datenbankverbindung
+                rs1.Close();
+                _conn1.Close();
+            }
+        }
+
+        // Das aktuelle Lehrjahr berechnen mit dem Jahrgangjahr
+        private int LehrjahrBrechnen(int jahrgang)
+        {
+            int todaysYear = DateTime.Now.Year;
+            int todaysMonth = DateTime.Now.Month;
+            int year = todaysYear - jahrgang;
+
+            // Beachten des Lehrjahrwechsels bei August (8)
+            if (todaysMonth >= 8)
+            {
+                year = year++;
+            }
+
+            return year;
+        }
+
+        // Exportiert die Einsatzdaten aller Azubis der nächsten zwei Jahre
+        protected void ux_exportButton_Click(object sender, EventArgs e)
+        {
+            Export export = new Export();
+            export.GesamtExportxlsx();
+            Response.Redirect(@"Export\ExportAll.xlsx");
+        }
+
+        // Importiert die Daten einer Exceltabelle
+        protected void ux_importButton_Click(object sender, EventArgs e)
+        {
+            string logonUser = Request.LogonUserIdentity.Name.ToLower().Replace(@"ibbads\", "");
+            Import import = new Import();
+            import.Importxlsx();
+        }
+    }
+}

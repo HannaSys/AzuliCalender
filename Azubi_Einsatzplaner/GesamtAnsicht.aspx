@@ -1,0 +1,38 @@
+﻿<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="GesamtAnsicht.aspx.cs" Inherits="Azubi_Einsatzplaner.GesamtAnsicht" %>
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Azubi Einsatzplaner</title>
+    <link href="menubar_styles.css" rel="stylesheet" />
+    <link href="calender_styles.css" rel="stylesheet" />
+</head>
+<body>
+    <form id="form1" runat="server">
+        <div>
+            <table class="spacing"> 
+                <tr> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx'">Gesamt</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=0'">Lehrjahr 0</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=1'">Lehrjahr 1</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=2'">Lehrjahr 2</td> 
+                    <td class="lehrjahr" onclick="location.href='Gesamtansicht.aspx?cell=3'">Lehrjahr 3</td>
+                    <td style="text-align:right">
+                        <asp:Button ID="ux_importButton" runat="server" Text="Import" OnClick="ux_importButton_Click"/>
+                        <asp:Button ID="ux_exportButton" runat="server" Text="Export" OnClick="ux_exportButton_Click" />
+                    </td>
+                </tr> 
+            </table>
+        </div>
+        <hr />
+        <div>
+
+            <asp:Table ID="ux_AzubiInfoTable" runat="server" CssClass="calendar">
+            </asp:Table>
+
+        </div>
+    </form>
+</body>
+</html>

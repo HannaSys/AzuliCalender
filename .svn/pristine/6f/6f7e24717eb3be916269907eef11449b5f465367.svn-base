@@ -1,0 +1,984 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Globalization;
+using System.Web.UI;
+using System.Web.UI.HtmlControls;
+using System.Web.UI.WebControls;
+
+
+namespace Azubi_Einsatzplaner
+{
+    public partial class Calender : System.Web.UI.Page
+    {
+        // Datenbank Connection
+        readonly string _gConnectStr = Properties.Settings.Default.DBConnectionString;
+        readonly ADODB.Connection _conn1 = new ADODB.Connection();
+
+        // Farben für die Abwesenheiten
+        private Color feiertagColor = Color.FromArgb(102, 206, 224);
+        private Color wochenendeColor = Color.FromArgb(186, 182, 147);
+        private Color berufsschuleColor = Color.FromArgb(255, 203, 5);
+        private Color urlaubColor = Color.FromArgb(162, 205, 3);
+        private Color einsatzColor = Color.FromArgb(227, 226, 213);
+        private Color ferienColor = Color.FromArgb(192, 229, 235);
+        private Color headerColor = Color.FromArgb(4, 149, 197);
+
+        Berechtigungen berechtigung = new Berechtigungen();
+
+        // Admin darf alles
+        string admin = Properties.Settings.Default.admin;
+
+        protected void Page_Init(object sender, EventArgs e)
+        {
+            string logonUser = Request.LogonUserIdentity.Name.ToLower().Replace(@"ibbads\", "");
+
+            // Überprüfen, ob Year-Parameter übergeben wurde
+            if (Request.QueryString["year"] != null)
+            {
+                if (berechtigung.CheckUserRights(Request.QueryString["azubi"], logonUser))
+                {
+                    // Jahr in eine Variable schreiben
+                    int year = Convert.ToInt32(Request.QueryString["year"]);
+
+                    // Zwischenspeichern für Seitenaktualisierungen
+                    ViewState["Year"] = year;
+
+                    // Übersichten laden
+                    AzubiData_Load(year);
+                    Fachbereiche_Load();
+                    CreateLegend();
+                }
+                else
+                {
+                    ux_todaysYearLabel.Text = "Sie haben keine Rechte um auf diesen Kalender zuzugreifen.";
+                    ux_todaysYearLabel.ForeColor = Color.Red;
+                    ux_nextYearButton.Enabled = false;
+                    ux_previousYearButton.Enabled = false;
+                    ux_saveBtton.Enabled = false;
+                    ux_EinsatzDatumAnfang.Enabled = false;
+                    ux_EinsatzDatumEnde.Enabled = false;
+                    ux_AbteilungenDropDown.Enabled = false;
+
+                }
+            } else
+            {
+                // An die GesamtAnsicht weiterleiten
+                Response.Redirect("GesamtAnsicht.aspx");
+            }
+        }
+        protected void Page_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        // Ausgewählten Azubi auslesen 
+        private void AzubiData_Load(int year)
+        {
+            // Überprüfen, ob Year-Parameter übergeben wurde
+            if (Request.QueryString["azubi"] != null)
+            {
+                _conn1.Open(_gConnectStr);
+                ADODB.Recordset rs1 = new ADODB.Recordset();
+                
+                // Informationen des Azubis auslesen und darstellen
+                rs1.Open("SELECT * FROM Auszubildender WHERE kuerzel ='" + Request.QueryString["azubi"] + "'", _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+
+                // Labels beschreiben
+                ux_vornameLabel.Text = rs1.Fields["Vorname"].Value.ToString();
+                ux_nachnameLabel.Text = rs1.Fields["Nachname"].Value.ToString();
+                ux_fachrichtungLabel.Text = rs1.Fields["Fachrichtung"].Value.ToString();
+                ux_jahrgangLabel.Text = rs1.Fields["Jahrgang"].Value.ToString();
+                ux_turnusLabel.Text = rs1.Fields["Turnus"].Value.ToString();
+
+                // Schließen der Datenbankverbindung
+                rs1.Close();
+                _conn1.Close();
+
+                // Kalender des entsprechenden Azubis im ausgewählten Jahr erzeugen
+                CreateCalendar(year);
+            }
+            else
+            {
+                // An die GesamtAnsicht weiterleiten
+                Response.Redirect("GesamtAnsicht.aspx");
+            }
+        }
+
+        // Fachbereiche in das DropDown schreiben
+        private void Fachbereiche_Load()
+        {
+            ux_AbteilungenDropDown.Items.Clear();
+            _conn1.Open(_gConnectStr);
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+            string logonUser = Request.LogonUserIdentity.Name.ToLower().Replace(@"ibbads\", "");
+
+            // Alle Abteilungen auslesen und in Dropdown schreiben
+            rs1.Open("SELECT * FROM Abteilung;", _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+
+            // Leeres Auswahlelement erzeugen
+            ux_AbteilungenDropDown.Items.Add(new ListItem(""));
+            // Urlaubsauswahl erzeugen
+            ux_AbteilungenDropDown.Items.Add(new ListItem("Urlaub"));
+
+            if (logonUser == admin)
+            {
+                while (!rs1.EOF)
+                {
+                    // Fachbereich der Liste/Dropdown hinzufügen
+                    ux_AbteilungenDropDown.Items.Add(new ListItem(rs1.Fields["Abteilung"].Value.ToString()));
+                    rs1.MoveNext();
+                }
+            }
+            // Schließen der Datenbankverbindung
+            rs1.Close();
+            _conn1.Close();
+        }
+
+        // Kalenderansicht erstellen (Alle Tage im Jahr)
+        private void CreateCalendar(int year)
+        {
+            string logonUser = Request.LogonUserIdentity.Name.ToLower().Replace(@"ibbads\", "");
+
+            // Alle Listen erzeugen
+            List<DateTime> feiertage = FeiertageBerechnen(year); 
+            List<Einsatz> berufsschule = GetTagesRange("Berufsschule");
+            List<Einsatz> urlaub = GetTagesRange("Urlaub");
+            List<Einsatz> einsaetze = GetTagesRange("Einsatz");
+            List<Einsatz> ferien = GetTagesRange("Ferien");
+            List<Einsatz> brueckentag = GetTagesRange("Brueckentag");
+
+            int i = 0;
+
+            // Vorherige Anzeigen löschen
+            ux_calendarTable.Rows.Clear();
+
+            // Ausgewähltes Jahr darstellen
+            ux_todaysYearLabel.Text = year.ToString();
+
+            // Überschriften für die Spalten der Monate
+            TableRow headerRow = new TableRow();
+            for (int month = 1; month <= 12; month++)
+            {
+                TableCell headerCell = new TableCell();
+                CheckBox checkBox = new CheckBox();
+
+                checkBox.ID = month.ToString();
+                checkBox.Text = GetMonthName(month);
+                checkBox.Font.Bold = true;
+                // Setze die AutoPostBack-Eigenschaft auf true, damit die Seite zurück zum Server gesendet wird, wenn sich die Auswahl der CheckBox ändert
+                checkBox.AutoPostBack = true;
+                // Füge einen Event-Handler für das CheckedChanged-Event hinzu
+                checkBox.CheckedChanged += new EventHandler(ShowDatumOnTextBoxen);
+
+                headerCell.Controls.Add(checkBox);
+
+                headerCell.BackColor = headerColor;
+                headerCell.HorizontalAlign = HorizontalAlign.Center;
+                headerRow.Cells.Add(headerCell);
+            }
+            ux_calendarTable.Rows.Add(headerRow);
+
+            // Reihen für jeden Tag erstellen
+            for (int day = 1; day <= 31; day++)
+            {
+                TableRow dayRow = new TableRow();
+
+                // Jede Spalte der Monate durchgehen
+                for (int month = 1; month <= 12; month++)
+                {
+                    TableCell dayCell = new TableCell();
+
+                    //Überprüfen ob Reihenzahl noch innerhalb der Anzahl der Tage im Monat liegt
+                    if (day <= DateTime.DaysInMonth(year, month))
+                    {
+                        //Datum in die Zelle schreiben
+                        DateTime todaysDate = new DateTime(year, month, day);
+                        String dayOfWeek = GetDayOfWeek(year, month, day);
+                        dayCell.Text = day + " " + dayOfWeek.Substring(0, 2);
+
+                        // Ferien farbig markieren
+                        foreach (Einsatz einsatz in ferien)
+                        {
+                            if (einsatz.Datum == todaysDate)
+                            {
+                                dayCell.BackColor = ferienColor;
+                            }
+                        }
+
+                        // Brückentage farbig markieren
+                        foreach (Einsatz einsatz in brueckentag)
+                        {
+                            if (einsatz.Datum == todaysDate)
+                            {
+                                dayCell.BackColor = ferienColor;
+                            }
+                        }
+
+                        // Einsätze farbig markieren
+                        foreach (Einsatz einsatz in einsaetze)
+                        {
+                            if (einsatz.Datum == todaysDate)
+                            {
+                                dayCell.BackColor = einsatzColor;
+                                // Linkbutton zum Aufrufen des Einsatzes erstellen
+                                LinkButton linkButton = new LinkButton();
+                                linkButton.BackColor = einsatzColor;
+                                linkButton.ID = "Einsatz_" + einsatz.ID.ToString() + "_" + i;
+                                i++;
+
+                                if (einsatz.Abteilung.Length > 3)
+                                {
+                                    // Einsatznamen kürzen falls nötig auf nur 3 Buchstaben
+                                    linkButton.Text = dayCell.Text + " (" + einsatz.Abteilung.Substring(0, 3) + ")";
+                                } else
+                                {
+                                    linkButton.Text = dayCell.Text + " (" + einsatz.Abteilung + ")";
+                                }
+
+                                // Wenn der User der Admin ist, dann darf er die Einsätze bearbeiten -> Azubis nicht
+                                if (logonUser == admin)
+                                {
+                                    linkButton.Click += GetEinsatz;
+                                }                               
+                                linkButton.ForeColor = Color.Black;
+                                linkButton.Attributes["style"] = "text-decoration: none;";
+                                dayCell.Controls.Add(linkButton);
+                            }
+                        }
+
+                        // Urlaub farbig markieren
+                        foreach (Einsatz einsatz in urlaub)
+                        {
+                            if (einsatz.Datum == todaysDate)
+                            {
+                                dayCell.Controls.Clear();
+                                dayCell.BackColor = urlaubColor;
+
+                                // Linkbutton zum bearbeiten der Urlaube erstellen -> Azubi und Admin dürfen diese bearbeiten
+                                LinkButton linkButton = new LinkButton();
+                                linkButton.BackColor = urlaubColor;
+                                linkButton.ID = "Urlaub_" + einsatz.ID.ToString() + "_" + i;
+                                i++;
+                                linkButton.Text = day + " " + dayOfWeek.Substring(0, 2) + " (Ur)";
+                                linkButton.Click += GetEinsatz;
+                                linkButton.ForeColor = Color.Black;
+                                linkButton.Attributes["style"] = "text-decoration: none;";
+                                dayCell.Controls.Add(linkButton);
+                            }
+                        }
+
+                        // Berufsschule farbig markieren
+                        // ## Brückentage werden noch nicht korrekt angezeigt
+                        foreach (Einsatz einsatz in berufsschule)
+                        {
+                            if (einsatz.Datum == todaysDate)
+                            {
+                                // Brückentage farbig markieren
+                                foreach (Einsatz tag in brueckentag)
+                                {
+                                    if (tag.Datum == todaysDate)
+                                    {
+                                    dayCell.BackColor = berufsschuleColor;
+                                    dayCell.Text = day + " " + dayOfWeek.Substring(0, 2) + " (OSZ)";
+                                    }
+                                }
+
+                            }
+                        }
+
+                        // Feiertage farbig markieren
+                        foreach (DateTime datum in feiertage)
+                        {
+                            if (datum == todaysDate)
+                            {
+                                dayCell.BackColor = feiertagColor;
+                                dayCell.Text = day + " " + dayOfWeek.Substring(0, 2);
+                            }
+                        }
+
+                        // Wochenenden farbig markieren
+                        if (dayOfWeek == "Samstag" || dayOfWeek == "Sonntag")
+                        {
+                            dayCell.BackColor = wochenendeColor;
+                            dayCell.Text = day + " " + dayOfWeek.Substring(0, 2);
+                        }
+                    }                 
+                    dayCell.HorizontalAlign = HorizontalAlign.Center;
+                    dayRow.Cells.Add(dayCell);
+                }
+                ux_calendarTable.Rows.Add(dayRow);
+            }
+        }
+
+        // Die Einsatz auslesen wenn auf den Linkbutton der Übersicht geklickt wurde
+        private void GetEinsatz(object sender, EventArgs e)
+        {
+
+            LinkButton clickedButton = (LinkButton)sender;
+            string idCell = clickedButton.ID.ToString();
+
+            string[] idStrings = idCell.Split('_');
+
+            // Gespeicherte ID auslesen um den Einsatz wiederzufinden
+            string tabelle = idStrings[0];
+            string id = idStrings[1];
+
+            _conn1.Open(_gConnectStr);
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+
+            // Einsatz auslesen per ID
+            string anfrage = "SELECT * FROM " + tabelle + " WHERE ID = " + id + " ;";
+            rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+            string abteilung = "";
+
+            if (tabelle == "Einsatz")
+            {
+                abteilung = rs1.Fields["ID_Abteilung"].Value.ToString();
+            }
+            else if (tabelle == "Urlaub")
+            {
+                abteilung = "Urlaub";
+            }
+
+            // Einsatz darstellen um die zu bearbeiten
+            ux_EinsatzDatumAnfang.Text = rs1.Fields["Anfangsdatum"].Value.ToString("dd.MM.yyyy");
+            ux_EinsatzDatumEnde.Text = rs1.Fields["Enddatum"].Value.ToString("dd.MM.yyyy");
+            ux_idLabel.Text = tabelle + "_" + rs1.Fields["ID"].Value.ToString() + "_" + abteilung;
+
+            // Schließen der Datenbankverbindung
+            rs1.Close();
+            _conn1.Close();
+
+            // Abteilung einsetzen
+            Fachbereiche_Load();
+            ux_AbteilungenDropDown.SelectedValue = abteilung;
+
+            // Nur den Editor-BUtton benutzen bei bearbeitung eines Einsatzes
+            ux_saveBtton.Visible = false;
+            ux_saveBtton.Enabled = false;
+            ux_EditSaveButton.Visible = true;
+            ux_EditSaveButton.Enabled = true;           
+            
+        }
+
+        private void ShowDatumOnTextBoxen(object sender, EventArgs e)
+        {
+            CheckedChanged();
+        }
+
+        // Zeigt die Datumsangaben nach Checkbox veränderung
+        private void CheckedChanged()
+        {
+            int year = (int)ViewState["Year"];
+            int kleinsterMonat = 12;
+            int groessterMonat = 1;
+            List<CheckBox> checkBoxList = new List<CheckBox>();
+
+            // Durchlaufe die erste Zeile der Tabelle
+            TableRow headerRow = ux_calendarTable.Rows[0];
+            foreach (TableCell cell in headerRow.Cells)
+            {
+                // Überprüfe, ob die Zelle ein CheckBox-Steuerelement enthält
+                if (cell.Controls.Count > 0 && cell.Controls[0] is CheckBox)
+                {
+                    // Lese die CheckBox aus
+                    CheckBox checkBox = (CheckBox)cell.Controls[0];
+                    int id = int.Parse(checkBox.ID);
+
+                    // Wenn die CheckBox bereits ausgewählt ist, füge sie der Liste hinzu
+                    if (checkBox.Checked)
+                    {
+                        checkBoxList.Add(checkBox);
+                    }
+                    // Wenn die ID zwischen kleinsterMonat und groessterMonat liegt, selektiere die CheckBox
+                    else if (id >= kleinsterMonat && id <= groessterMonat)
+                    {
+                        checkBox.Checked = true;
+                        checkBoxList.Add(checkBox);
+                    }
+                }
+            }
+
+            // Die größte und kleine Checkbox bestimmen
+            foreach (CheckBox checkbox in checkBoxList)
+            {
+                int id = int.Parse(checkbox.ID);
+
+                if (id >= groessterMonat)
+                {
+                    groessterMonat = id;
+                }
+                if (id <= kleinsterMonat)
+                {
+                    kleinsterMonat = id;
+                }
+
+            }
+
+            if (checkBoxList.Count == 0)
+            {
+                ux_EinsatzDatumAnfang.Enabled = true;
+                ux_EinsatzDatumEnde.Enabled = true;
+            } else
+            {
+                // Daten darstellen
+                DateTime anfang = new DateTime(year, kleinsterMonat, 1);
+                int tageImMonat = DateTime.DaysInMonth(year, groessterMonat);
+                DateTime ende = new DateTime(year, groessterMonat, tageImMonat);
+
+                ux_EinsatzDatumAnfang.Text = anfang.ToString("dd.MM.yyyy");
+                ux_EinsatzDatumEnde.Text = ende.ToString("dd.MM.yyyy");
+                ux_EinsatzDatumAnfang.Enabled = false;
+                ux_EinsatzDatumEnde.Enabled = false;
+            }
+        }
+
+        // Liste der Einsätze mit einer Range erstellen
+        private List<Einsatz> GetTagesRange(string art)
+        {
+            List<Einsatz> allEinsaetze = new List<Einsatz>();
+            string anfrage;
+            DateTime anfangsdatum;
+            DateTime enddatum;
+
+            _conn1.Open(_gConnectStr);
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+
+            // Auswahl welche Liste man erstellen möchte -> dementsprechende Selection
+            switch (art)
+            {
+                case "Berufsschule":
+                    anfrage = "SELECT * FROM Berufsschule INNER JOIN Auszubildender ON Berufsschule.Bezeichnung = Auszubildender.Turnus WHERE Auszubildender.kuerzel = '" + Request.QueryString["azubi"] + "';" ;
+                    break;
+                case "Urlaub":
+                    anfrage = "SELECT * FROM " + art + " WHERE kuerzel_Auszubildender = '" + Request.QueryString["azubi"] + "';";
+                    break;
+                case "Einsatz":
+                    anfrage = "SELECT * FROM " + art + " WHERE kuerzel_Auszubildender = '" + Request.QueryString["azubi"] + "';";
+                    break;
+                case "Ferien":
+                    anfrage = "SELECT * FROM " + art + ";";
+                    break;
+                case "Brueckentag":
+                    anfrage = "SELECT * FROM Brueckentag INNER JOIN Auszubildender ON Brueckentag.Bezeichnung = Auszubildender.Turnus WHERE Auszubildender.kuerzel = '" + Request.QueryString["azubi"] + "';";
+                    break;
+                default:
+                    anfrage = "";
+                    break;
+            }
+            // Alle Einsätze des ausgewählten Azubis abrufen
+            rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+
+            while (!rs1.EOF)
+            {
+                anfangsdatum = rs1.Fields["Anfangsdatum"].Value;
+                enddatum = rs1.Fields["Enddatum"].Value;
+                string abteilung;
+                int id = rs1.Fields["ID"].Value;
+
+                // Auswahl welche Liste man erstellen möchte -> dementsprechende Selection
+                switch (art)
+                {
+                    case "Berufsschule":
+                        abteilung = rs1.Fields["Bezeichnung"].Value.ToString();
+                        break;
+                    case "Urlaub":
+                        abteilung = rs1.Fields["kuerzel_Auszubildender"].Value.ToString();
+                        break;
+                    case "Einsatz":
+                        abteilung = rs1.Fields["ID_Abteilung"].Value.ToString();
+                        break;
+                    case "Ferien":
+                        abteilung = rs1.Fields["Bezeichnung"].Value.ToString();
+                        break;
+                    case "brueckentag":
+                        abteilung = rs1.Fields["Bezeichnung"].Value.ToString();
+                        break;
+                    default:
+                        abteilung = "";
+                        break;
+                }
+
+                // Die Zeitspanne der Range füllen
+                List<Einsatz> allTagesEinsaetze = FillTage(anfangsdatum, enddatum, abteilung, id);
+
+                // Listen aneinanderfügen für spätere Ausgabe
+                allEinsaetze.AddRange(allTagesEinsaetze);
+
+                rs1.MoveNext();
+            }
+
+            // Schließen der Datenbankverbindung
+            rs1.Close();
+            _conn1.Close();
+
+            return allEinsaetze;
+        }
+
+        // Die Tage der Range erzeugen
+        private List<Einsatz> FillTage(DateTime anfangsdatum, DateTime enddatum, string abteilung, int id)
+        {
+            List<Einsatz> allTagesEinsaetze = new List<Einsatz>();
+
+            // Die Tage zwischen Anfangs- und Enddatum erstellen und zu einer Liste hinzufügen
+            // So können alle Tage des Einsatzes markiert werden
+            for (DateTime date = anfangsdatum; date <= enddatum; date = date.AddDays(1))
+            {
+                Einsatz tagesEinsatz = new Einsatz();
+                tagesEinsatz.Datum = date;
+                tagesEinsatz.Abteilung = abteilung;
+                tagesEinsatz.Kuerzel = Request.QueryString["azubi"];
+                tagesEinsatz.ID = id;
+                allTagesEinsaetze.Add(tagesEinsatz);
+            }
+            return allTagesEinsaetze;
+        }
+
+        // Überprüft ob die Einsätze in einen anderen Einsatz fallen
+        // gbt die Datumsangaben zurück wo das der fall ist
+        private List<Einsatz> CheckAllDays (List<Einsatz> einsaetze)
+        {
+            List<Einsatz> belegteEinsaetze = new List<Einsatz>();
+
+            foreach (Einsatz einsatz in einsaetze)
+            {
+                if (einsatz.CheckEinsatz())
+                {
+                    belegteEinsaetze.Add(einsatz);
+                }
+            }
+            return belegteEinsaetze;
+        }
+
+        // Erstellt die Farblegende für den Kalender
+        private void CreateLegend()
+        {
+            ux_legendeTable.Rows.Clear();
+
+            TableRow wochenendeRow = new TableRow();
+            TableCell wochenendeCell = new TableCell();
+            wochenendeCell.Text = "Wochenende";
+            wochenendeCell.BackColor = wochenendeColor;
+            wochenendeRow.Cells.Add(wochenendeCell);
+            ux_legendeTable.Rows.Add(wochenendeRow);
+
+            TableRow feiertagRow = new TableRow();
+            TableCell feiertagCell = new TableCell();
+            feiertagCell.Text = "Feiertag";
+            feiertagCell.BackColor = feiertagColor;
+            feiertagRow.Cells.Add(feiertagCell);
+            ux_legendeTable.Rows.Add(feiertagRow);
+
+            TableRow berufsschulRow = new TableRow();
+            TableCell berufsschulCell = new TableCell();
+            berufsschulCell.Text = "Berufsschule";
+            berufsschulCell.BackColor = berufsschuleColor;
+            berufsschulRow.Cells.Add(berufsschulCell);
+            ux_legendeTable.Rows.Add(berufsschulRow);
+
+            TableRow urlaubRow = new TableRow();
+            TableCell urlaubCell = new TableCell();
+            urlaubCell.Text = "Urlaub";
+            urlaubCell.BackColor = urlaubColor;
+            urlaubRow.Cells.Add(urlaubCell);
+            ux_legendeTable.Rows.Add(urlaubRow);
+
+            TableRow einsatzRow = new TableRow();
+            TableCell einsatzCell = new TableCell();
+            einsatzCell.Text = "Einsatz";
+            einsatzCell.BackColor = einsatzColor;
+            einsatzRow.Cells.Add(einsatzCell);
+            ux_legendeTable.Rows.Add(einsatzRow);
+
+
+            TableRow ferienRow = new TableRow();
+            TableCell ferienCell = new TableCell();
+            ferienCell.Text = "Ferien";
+            ferienCell.BackColor = ferienColor;
+            ferienRow.Cells.Add(ferienCell);
+            ux_legendeTable.Rows.Add(ferienRow);
+
+        }
+
+        // Das ausgewählte Jahr vermindern und dann anzeigen
+        protected void ux_previousYearButton_Click(object sender, EventArgs e)
+        {
+            // Jahresvariable aus dem Viewstate entnehmen und neu speichern
+            int year = (int)ViewState["Year"];
+            year--;
+            ViewState["Year"] = year;
+            CreateCalendar(year);
+        }
+
+        // Das ausgewählte Jahr erhöhen und dann anzeigen
+        protected void ux_nextYearButton_Click(object sender, EventArgs e)
+        {
+            // Jahresvariable aus dem Viewstate entnehmen und neu speichern
+            int year = (int)ViewState["Year"];
+            year++;
+            ViewState["Year"] = year;
+            CreateCalendar(year);
+        } 
+
+        // Exportiert die Einsatzdaten aller Azubis der nächsten zwei Jahre
+        protected void ux_exportButton_Click(object sender, EventArgs e)
+        {
+            Export export = new Export();
+            export.SingleExportxlsx(Request.QueryString["azubi"]);
+        }
+
+        // Speichert bzw löscht die Einträge 
+        protected void ux_saveBtton_Click(object sender, EventArgs e)
+        {                
+            CheckedChanged();
+            // Liste für die Tage des angegebenen Zeitraums
+            List<Einsatz> alleDaten = new List<Einsatz>();
+            string anfang = ux_EinsatzDatumAnfang.Text;
+            string ende = ux_EinsatzDatumEnde.Text;
+
+            // Anfangsdatum und Enddatum müssen angegeben sein
+            if (anfang != "" && ende != "")
+            {
+                string abteilung = ux_AbteilungenDropDown.SelectedValue;
+                try
+                {
+                    if (DateTime.Parse(ux_EinsatzDatumAnfang.Text).GetType() == typeof(DateTime) && DateTime.Parse(ux_EinsatzDatumAnfang.Text).GetType() == typeof(DateTime))
+                    {
+                        DateTime anfangsdatum = DateTime.Parse(ux_EinsatzDatumAnfang.Text);
+                        DateTime enddatum = DateTime.Parse(ux_EinsatzDatumEnde.Text);
+
+                        // Datumsangaben tauschen bei vertauschter angabe
+                        if (enddatum < anfangsdatum)
+                        {
+                            DateTime tmp;
+                            tmp = anfangsdatum;
+                            anfangsdatum = enddatum;
+                            enddatum = tmp;
+                        }
+
+                        // Zeitraum befüllen
+                        alleDaten = FillTage(anfangsdatum, enddatum, abteilung, 0);
+                        // Überprüfen ob kein anderer Einsatz in den Zeitraum stattfindet
+                        alleDaten = CheckAllDays(alleDaten);
+
+                        // falls ein anderer Einsatz sich überschneidet ist bei der Liste min 1 Element
+                        if (alleDaten.Count >= 1)
+                        {
+                            // Wenn die Abteilung leer ist soll der Zeitraum bzw stattfindende Einsätze gelöscht werden
+                            if (abteilung == "")
+                            {
+                                foreach (Einsatz einsatz in alleDaten)
+                                {
+                                    einsatz.DeleteEinsatz(einsatz.Datum, "Urlaub");
+                                    einsatz.DeleteEinsatz(einsatz.Datum, "Einsatz");
+                                }
+                                ux_FehlermeldungLabel.Visible = false;
+                            }
+                            // Falls nicht dann könnt eine Fehlermeldung für den User
+                            else
+                            {
+                                ux_FehlermeldungLabel.Visible = true;
+                                ux_FehlermeldungLabel.Text = "Zu der Zeit findet ein anderer Einsatz statt.";
+                                ux_FehlermeldungLabel.ForeColor = Color.Red;
+                            }
+
+                            // wenn keine anderen Einsätze in dem Zeitraum sind dann wird der Einsatz gespeichert
+                        }
+                        else
+                        {
+                            // Überprüfen ob eine Abteilung ausgewählt wurde
+                            if (abteilung != "")
+                            {
+                                _conn1.Open(_gConnectStr);
+                                ADODB.Recordset rs1 = new ADODB.Recordset();
+                                string anfrage;
+
+                                // Die richtige Datenbank aufrufen
+                                switch (abteilung)
+                                {
+                                    case "Urlaub":
+                                        anfrage = "SELECT * FROM Urlaub WHERE Anfangsdatum IS NULL;";
+                                        break;
+                                    default:
+                                        anfrage = "SELECT * FROM Einsatz WHERE Anfangsdatum IS NULL;";
+                                        break;
+                                }
+                                // Leeren Datensatz erzeugen
+                                rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+
+                                // Daten in den leeren Satz schreiben
+                                rs1.AddNew();
+                                rs1.Fields["Anfangsdatum"].Value = anfangsdatum;
+                                rs1.Fields["Enddatum"].Value = enddatum;
+
+                                // Felder den Datenbanken angepasst speichern
+                                switch (abteilung)
+                                {
+                                    case "Urlaub":
+                                        rs1.Fields["kuerzel_Auszubildender"].Value = Request.QueryString["azubi"];
+                                        break;
+                                    default:
+                                        rs1.Fields["ID_Abteilung"].Value = abteilung;
+                                        rs1.Fields["kuerzel_Auszubildender"].Value = Request.QueryString["azubi"];
+                                        break;
+                                }
+
+                                // Updaten und schließen der Datenbankverbindung
+                                rs1.Update();
+                                rs1.Close();
+                                _conn1.Close();
+
+                                ux_FehlermeldungLabel.Enabled = false;
+
+                                // Bei keiner ausgewählten Abteilung kommt Fehlermeldung für den User
+                            }
+                            else
+                            {
+                                ux_FehlermeldungLabel.Visible = true;
+                                ux_FehlermeldungLabel.Text = "Bitte alle Felder ausfüllen.";
+                                ux_FehlermeldungLabel.ForeColor = Color.Red;
+                            }
+                        }
+                    }
+                } catch (FormatException)
+                {
+                    ux_FehlermeldungLabel.Visible = true;
+                    ux_FehlermeldungLabel.Text = "Fehler: Ungültiges Datum";
+                }
+                
+
+            // Falls es keine Datumsangaben gab kommt Fehlermeldung für den User
+            }
+            else
+            {
+                ux_FehlermeldungLabel.Visible = true;
+                ux_FehlermeldungLabel.Text = "Bitte alle Felder ausfüllen.";
+                ux_FehlermeldungLabel.ForeColor = Color.Red;
+            }
+            ux_EinsatzDatumAnfang.Enabled = true;
+            ux_EinsatzDatumEnde.Enabled = true;
+            // Kalender und Azubi werden neu geladen
+            int year = (int)ViewState["Year"];
+            AzubiData_Load(year);
+        }
+
+        // Speichert einen bearbeiteten Einsatz
+        protected void ux_EditSaveButton_Click(object sender, EventArgs e)
+        { 
+            string[] idStrings = ux_idLabel.Text.Split('_');
+            string tabelle = idStrings[0];
+            string id = idStrings[1];
+            string abteilung = idStrings[2];
+
+            _conn1.Open(_gConnectStr);
+            ADODB.Recordset rs1 = new ADODB.Recordset();
+
+            // Datumsangaben tauschen falls sie verkehrt sind
+            if (DateTime.Parse(ux_EinsatzDatumAnfang.Text) > DateTime.Parse(ux_EinsatzDatumEnde.Text)){
+                string tmp = ux_EinsatzDatumAnfang.Text;
+                ux_EinsatzDatumAnfang.Text = ux_EinsatzDatumEnde.Text;
+                ux_EinsatzDatumEnde.Text = tmp;
+            }
+
+            try
+            {
+                // Wenn der Einsatz gleich bleibt nur die Datumangaben speichern/ändern
+                if (ux_AbteilungenDropDown.SelectedValue.ToString() == abteilung)
+                {
+                    // Einsatz auslesen per ID
+                    string anfrage = "SELECT * FROM " + tabelle + " WHERE ID = " + id + " ;";
+                    rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+                    rs1.Fields["Anfangsdatum"].Value = ux_EinsatzDatumAnfang.Text;
+                    rs1.Fields["Enddatum"].Value = ux_EinsatzDatumEnde.Text;
+
+                    // Schließen der Datenbankverbindung
+                    rs1.Update();
+                    rs1.Close();
+                    _conn1.Close();
+                }
+                // Falls der Einsatz gelöscht werden soll
+                else if (ux_AbteilungenDropDown.SelectedValue.ToString() == "")
+                {
+                    // Einsatz auslesen per ID
+                    string anfrage = "SELECT * FROM " + tabelle + " WHERE ID = " + id + " ;";
+                    rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+                    // Einsatz löschen aus anderer Tabelle
+                    rs1.Delete();
+
+                    // Schließen der Datenbankverbindung
+                    rs1.Update();
+                    rs1.Close();
+                    _conn1.Close();
+
+                }
+                // Falls der Einsatz nun Urlaub ist und vorher etwas anderes
+                else if (ux_AbteilungenDropDown.SelectedValue.ToString() == "Urlaub" && ux_AbteilungenDropDown.SelectedValue.ToString() != abteilung)
+                {
+                    // Einsatz auslesen per ID
+                    string anfrage = "SELECT * FROM " + tabelle + " WHERE ID = " + id + " ;";
+                    rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+                    // Einsatz löschen aus anderer Tabelle
+                    rs1.Delete();
+
+                    // Schließen der Datenbankverbindung
+                    rs1.Update();
+                    rs1.Close();
+                    _conn1.Close();
+
+                    tabelle = "Urlaub";
+                    anfrage = "SELECT * FROM " + tabelle + " WHERE Anfangsdatum IS NULL ;";
+                    rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+                    rs1.AddNew();
+                    rs1.Fields["Anfangsdatum"].Value = ux_EinsatzDatumAnfang.Text;
+                    rs1.Fields["Enddatum"].Value = ux_EinsatzDatumEnde.Text;
+                    rs1.Fields["kuerzel_Auszubildender"].Value = Request.QueryString["azubi"];
+
+                    // Schließen der Datenbankverbindung
+                    rs1.Update();
+                    rs1.Close();
+                    _conn1.Close();
+                }
+                // Wenn der Einsatz von Urlaub zu einer Abteilung verändert wurde
+                else if (ux_AbteilungenDropDown.SelectedValue.ToString() != "Urlaub" && "Urlaub" == abteilung)
+                {
+                    // Einsatz auslesen per ID
+                    string anfrage = "SELECT * FROM Urlaub WHERE ID = " + id + " ;";
+                    rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+                    rs1.Delete();
+
+                    // Schließen der Datenbankverbindung
+                    rs1.Update();
+                    rs1.Close();
+                    _conn1.Close();
+
+                    tabelle = "Einsatz";
+                    anfrage = "SELECT * FROM " + tabelle + " WHERE Anfangsdatum IS NULL ;";
+                    rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+                    rs1.AddNew();
+                    rs1.Fields["Anfangsdatum"].Value = ux_EinsatzDatumAnfang.Text;
+                    rs1.Fields["Enddatum"].Value = ux_EinsatzDatumEnde.Text;
+                    rs1.Fields["ID_Abteilung"].Value = ux_AbteilungenDropDown.SelectedValue.ToString();
+                    rs1.Fields["kuerzel_Auszubildender"].Value = Request.QueryString["azubi"];
+
+                    // Schließen der Datenbankverbindung
+                    rs1.Update();
+                    rs1.Close();
+                    _conn1.Close();
+
+                }                
+                // Wenn der Einsatz zu einer anderen Abteilung verändert wurde
+                else if (ux_AbteilungenDropDown.SelectedValue.ToString() != "Urlaub" && ux_AbteilungenDropDown.SelectedValue.ToString() != abteilung)
+                {
+                    string anfrage = "SELECT * FROM " + tabelle + " WHERE Anfangsdatum IS NULL ;";
+                    rs1.Open(anfrage, _conn1, ADODB.CursorTypeEnum.adOpenDynamic, ADODB.LockTypeEnum.adLockOptimistic);
+                    rs1.AddNew();
+                    rs1.Fields["Anfangsdatum"].Value = ux_EinsatzDatumAnfang.Text;
+                    rs1.Fields["Enddatum"].Value = ux_EinsatzDatumEnde.Text;
+                    rs1.Fields["ID_Abteilung"].Value = ux_AbteilungenDropDown.SelectedValue.ToString();
+                    rs1.Fields["kuerzel_Auszubildender"].Value = Request.QueryString["azubi"];
+
+                    // Schließen der Datenbankverbindung
+                    rs1.Update();
+                    rs1.Close();
+                    _conn1.Close();
+                }
+            } catch (FormatException)
+            {
+                ux_FehlermeldungLabel.Visible = true;
+                ux_FehlermeldungLabel.Text = "Bitte gültige Daten eingeben";
+            }
+
+            ux_idLabel.Text = "";
+            ux_saveBtton.Visible = true;
+            ux_saveBtton.Enabled = true;
+            ux_EditSaveButton.Visible = false;
+            ux_EditSaveButton.Enabled = false;           
+            AzubiData_Load((int)ViewState["Year"]);
+        }
+
+        // Erstellen einer Liste mit allen Feiertagen
+        private List<DateTime> FeiertageBerechnen(int year)
+        {
+            List<DateTime> feiertage = new List<DateTime>();
+            feiertage.Add(new DateTime(year, 01, 01)); // Neujahr
+            feiertage.Add(new DateTime(year, 03, 08)); // Frauentag
+            feiertage.Add(GetEasterFriday(year)); // Karfreitag
+            feiertage.Add(GetEasterSunday(year)); // Ostersonntag
+            feiertage.Add(GetEasterMonday(year)); // Ostermontag
+            feiertage.Add(new DateTime(year, 05, 01)); // Tag der Arbeit
+            feiertage.Add(GetAscensionDay(year)); // Christi Himmelfahrt
+            feiertage.Add(GetPentecostSunday(year)); // Pfingstsonntag
+            feiertage.Add(GetPentecostMonday(year)); // Pfingstmontag
+            feiertage.Add(new DateTime(year, 10, 03)); // Tag der Deutschen Einheit
+            feiertage.Add(new DateTime(year, 10, 31)); // Reformationstag
+            feiertage.Add(new DateTime(year, 12, 24)); // Heilig Abend
+            feiertage.Add(new DateTime(year, 12, 25)); // Weihnachtstag
+            feiertage.Add(new DateTime(year, 12, 26)); // Zweiter Weihnachtstag
+            feiertage.Add(new DateTime(year, 12, 31)); // Silvester
+
+            return feiertage;
+        }
+
+        // den Kalender unserer Kultur verwenden um den richtig Monat zu bekommen
+        private string GetMonthName(int month)
+        {
+            return CultureInfo.GetCultureInfo("de-DE").DateTimeFormat.GetMonthName(month);
+        }
+
+        // den Kalender unserer Kultur verwenden um den Wochentag zu bekommen
+        private string GetDayOfWeek(int year, int month, int day)
+        {
+            return CultureInfo.GetCultureInfo("de-DE").DateTimeFormat.GetDayName(new DateTime(year, month, day).DayOfWeek);
+        }
+
+        // Berechnung des Ostersonntags
+        public static DateTime GetEasterSunday(int year)
+        {
+            //https://dotnet-snippets.de/snippet/ermittlung-von-feiertagen-feiertaglogic/763
+            int g, h, c, j, l, i;
+
+            g = year % 19;
+            c = year / 100;
+            h = ((c - (c / 4)) - (((8 * c) + 13) / 25) + (19 * g) + 15) % 30;
+            i = h - (h / 28) * (1 - (29 / (h + 1)) * ((21 - g) / 11));
+            j = (year + (year / 4) + i + 2 - c + (c / 4)) % 7;
+
+            l = i - j;
+            int month = (int)(3 + ((l + 40) / 44));
+            int day = (int)(l + 28 - 31 * (month / 4));
+
+            return new DateTime(year, month, day);
+        }
+
+        // Himmelfahrt aus Ostersonntag berechnen
+        public static DateTime GetAscensionDay(int year)
+        {
+            return GetEasterSunday(year).AddDays(39);
+        }
+
+        // Pfingstsonntag aus Ostersonntag berechnen
+        public static DateTime GetPentecostSunday(int year)
+        {
+            return GetEasterSunday(year).AddDays(49);
+        }
+
+        // Pfingstmontag aus Ostersonntag berechnen
+        public static DateTime GetPentecostMonday(int year)
+        {
+            return GetPentecostSunday(year).AddDays(1);
+        }
+
+        // Osterfreitag aus Ostersonntag berechnen
+        public static DateTime GetEasterFriday(int year)
+        {
+            return GetEasterSunday(year).AddDays(-2);
+        }
+
+        // Ostermontag aus Ostersonntag berechnen
+        public static DateTime GetEasterMonday(int year)
+        {
+            return GetEasterSunday(year).AddDays(1);
+        }
+    }
+}

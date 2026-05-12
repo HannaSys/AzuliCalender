@@ -1,0 +1,23 @@
+﻿.lehrjahr{
+    border:2px outset;
+    border-radius:3px;
+    text-align:center;
+    
+}
+
+.searchbar{
+    text-align:right;
+}
+.lehrjahr:hover {
+    background-color: #D6EEEE;
+}
+
+.spacing {
+    width: 90%;
+    margin-left: 10%;
+}
+
+body {
+    margin-left: 5%;
+    margin-right: 5%;
+}
